@@ -22,10 +22,20 @@ export interface Deuda {
   tipoTasa: TipoTasa
   /** Cuota fija mensual (prestamos). En tarjetas puede ser 0 y usarse el minimo por %. */
   cuotaMensual: number
-  /** Tarjetas: pago minimo como % del saldo, ej. 5 */
+  /**
+   * Tarjetas que cobran el minimo como % del saldo. Estas tarjetas NO son ese
+   * caso: se paga una cuota fija (cuotaMensual). Se conserva para carteras que
+   * si funcionen asi, pero el formulario no lo pide.
+   */
   pagoMinimoPct?: number
   /** Tarjetas: piso absoluto del pago minimo */
   pagoMinimoPiso?: number
+  /** Dia del mes en que se paga (1..31). Opcional: alimenta los recordatorios. */
+  diaPago?: number
+  /** Tarjetas: dia de corte del estado de cuenta (1..31). Opcional. */
+  diaCorte?: number
+  /** Fecha del ultimo pago registrado, ISO "AAAA-MM-DD". Opcional. */
+  fechaUltimoPago?: string
   /** Solo informativo / para mostrar */
   mesesRestantes?: number
   limiteCredito?: number

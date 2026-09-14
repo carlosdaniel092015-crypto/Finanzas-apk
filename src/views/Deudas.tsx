@@ -6,12 +6,13 @@ import { ResultadoPlan } from '@/components/ResultadoPlan'
 import { compararEstrategias, ordenarDeudas, pagoMinimo } from '@/engine/plan'
 import { analizar } from '@/engine/alertas'
 import { formatMoney } from '@/lib/format'
-import { useFlujoCaja, useStore } from '@/store'
+import { useFlujoCaja, useStore, useUI } from '@/store'
 
 export function Deudas() {
   const { moneda, deudas, estrategia, agregarDeuda, eliminarDeuda, setEstrategia } = useStore()
   const { disponible, ingreso, totalGastos } = useFlujoCaja()
-  const [mostrarForm, setMostrarForm] = useState(false)
+  const mostrarForm = useUI((s) => s.formAbierto)
+  const setMostrarForm = useUI((s) => s.setFormAbierto)
   const [planVisible, setPlanVisible] = useState(false)
 
   const totalDeuda = deudas.reduce((s, d) => s + d.saldo, 0)
@@ -45,7 +46,7 @@ export function Deudas() {
         </div>
         <button
           type="button"
-          onClick={() => setMostrarForm((v) => !v)}
+          onClick={() => setMostrarForm(!mostrarForm)}
           className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-700/20 active:scale-95 transition shrink-0"
         >
           <PlusCircle className="w-4 h-4" />
@@ -55,6 +56,7 @@ export function Deudas() {
 
       {mostrarForm && (
         <FormNuevaDeuda
+          moneda={moneda}
           onCerrar={() => setMostrarForm(false)}
           onGuardar={(d) => {
             agregarDeuda(d)

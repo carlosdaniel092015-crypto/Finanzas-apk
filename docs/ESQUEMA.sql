@@ -95,8 +95,11 @@ create table deudas (
   fecha_fin_estimada     date,
   plazo_meses_total      smallint,
   plazo_meses_restantes  smallint,
+  -- Pago FIJO mensual. Es el campo principal tanto en tarjetas como en prestamos:
+  -- estas tarjetas no cobran un porcentaje del saldo, cobran una cuota fija.
   cuota_mensual          numeric(14,2),
-  dia_pago               smallint check (dia_pago between 1 and 31),
+  dia_pago               smallint check (dia_pago between 1 and 31),   -- opcional
+  fecha_ultimo_pago      date,                                          -- opcional
 
   -- Específico de tarjetas / líneas
   limite_credito         numeric(14,2),

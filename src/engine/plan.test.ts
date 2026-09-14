@@ -215,6 +215,49 @@ describe('simularSoloMinimos', () => {
   })
 })
 
+describe('tarjeta con CUOTA FIJA (el caso de esta cartera)', () => {
+  const tarjeta = (cuotaMensual: number): Deuda =>
+    deuda({
+      id: 't',
+      nombre: 'Tarjeta',
+      tipo: 'tarjeta',
+      saldo: 50000,
+      tasaAnual: 30,
+      tipoTasa: 'variable',
+      cuotaMensual,
+    })
+
+  it('el pago exigible es la cuota fija, no un porcentaje del saldo', () => {
+    expect(pagoMinimo(tarjeta(5000), 50000)).toBe(5000)
+  })
+
+  it('una cuota por debajo del interés mensual no paga nunca', () => {
+    // 30% anual sobre 50.000 = 1.250/mes de interés
+    expect(simularPlan([tarjeta(1250)], { estrategia: 'avalancha', excedenteMensual: 0 })
+      .insostenible).toBe(true)
+    expect(simularPlan([tarjeta(1000)], { estrategia: 'avalancha', excedenteMensual: 0 })
+      .meses).toBeNull()
+  })
+
+  it('apenas por encima del interés, se paga pero sale carísimo', () => {
+    const r = simularPlan([tarjeta(1300)], { estrategia: 'avalancha', excedenteMensual: 0 })
+    expect(r.insostenible).toBe(false)
+    expect(r.meses).toBeGreaterThan(120)
+    // Paga más de dos veces el saldo en intereses: eso es lo que hay que avisar.
+    expect(r.interesTotal).toBeGreaterThan(50000 * 2)
+  })
+
+  it('el interés corre desde el primer mes: no hay período de gracia', () => {
+    const r = simularPlan([tarjeta(5000)], { estrategia: 'avalancha', excedenteMensual: 0 })
+    expect(r.cronograma[0].interes).toBeCloseTo(1250, 0)
+  })
+
+  it('sin límite de crédito no se inventa utilización', () => {
+    const a = analizar({ ingresoMensual: 95000, gastosFijos: 40000, deudas: [tarjeta(5000)] })
+    expect(a.some((x) => /limite/.test(x.titulo))).toBe(false)
+  })
+})
+
 describe('analizar', () => {
   it('detecta la deuda que nunca baja', () => {
     const a = analizar({
@@ -243,6 +286,35 @@ describe('analizar', () => {
       deudas: [deuda({ id: 'p', nombre: 'Prestamo', saldo: 10000, cuotaMensual: 500, tasaAnual: 10 })],
     })
     expect(a.some((x) => x.nivel === 'critico' && /ingresos/.test(x.titulo))).toBe(true)
+  })
+
+  it('avisa cuando hay meses sin pago registrado', () => {
+    const hace4Meses = new Date()
+    hace4Meses.setMonth(hace4Meses.getMonth() - 4)
+    const a = analizar({
+      ingresoMensual: 95000,
+      gastosFijos: 40000,
+      deudas: [
+        deuda({
+          id: 'x',
+          nombre: 'Tarjeta',
+          saldo: 50000,
+          cuotaMensual: 5000,
+          tasaAnual: 30,
+          fechaUltimoPago: hace4Meses.toISOString().slice(0, 10),
+        }),
+      ],
+    })
+    expect(a.some((x) => /sin pago registrado/.test(x.titulo))).toBe(true)
+  })
+
+  it('no avisa de meses sin pago si no hay fecha registrada', () => {
+    const a = analizar({
+      ingresoMensual: 95000,
+      gastosFijos: 40000,
+      deudas: [deuda({ id: 'x', nombre: 'T', saldo: 50000, cuotaMensual: 5000, tasaAnual: 30 })],
+    })
+    expect(a.some((x) => /sin pago registrado/.test(x.titulo))).toBe(false)
   })
 
   it('no inventa alertas sin deudas', () => {

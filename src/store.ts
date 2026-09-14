@@ -87,6 +87,18 @@ export const useStore = create<Store>((set, get) => {
   }
 })
 
+/**
+ * Estado de interfaz, separado del financiero a proposito: no se persiste.
+ * La tarjeta flotante de "dinero disponible" se esconde mientras hay un
+ * formulario abierto, porque tapa justo donde aparecen los avisos de validacion.
+ */
+export const useUI = create<{ formAbierto: boolean; setFormAbierto: (v: boolean) => void }>(
+  (set) => ({
+    formAbierto: false,
+    setFormAbierto: (formAbierto) => set({ formAbierto }),
+  }),
+)
+
 /** Ingresos − gastos fijos. Es el motor de todo lo demas. */
 export function useFlujoCaja() {
   const ingreso = useStore((s) => s.ingresoMensual)

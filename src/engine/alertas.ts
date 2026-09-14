@@ -1,5 +1,6 @@
 import type { Deuda } from './tipos'
 import { pagoMinimo, simularPlan, tasaMensual } from './plan'
+import { mesesDesde } from '@/lib/fechas'
 
 export type NivelAlerta = 'critico' | 'atencion' | 'info'
 
@@ -100,7 +101,20 @@ export function analizar({
       })
     }
 
-    // 5. Exposicion a tasa variable
+    // 5. Meses sin pagar. Con interes corriendo desde el consumo, dos meses
+    //    parados ya son un salto grande en el saldo.
+    const sinPagar = mesesDesde(d.fechaUltimoPago)
+    if (sinPagar !== null && sinPagar >= 2) {
+      alertas.push({
+        nivel: sinPagar >= 3 ? 'critico' : 'atencion',
+        titulo: `${d.nombre}: ${sinPagar} meses sin pago registrado`,
+        detalle:
+          'El interés sigue corriendo. Si ya pagaste, actualiza la fecha; si no, esta deuda debería ser la prioridad.',
+        deudaId: d.id,
+      })
+    }
+
+    // 6. Exposicion a tasa variable
     if (d.tipoTasa === 'variable' && d.saldo > 0) {
       alertas.push({
         nivel: 'info',
@@ -111,7 +125,7 @@ export function analizar({
     }
   }
 
-  // 6. Fondo de emergencia
+  // 7. Fondo de emergencia
   const disponible = ingresoMensual - gastosFijos - cuotas
   if (gastosFijos > 0 && disponible > 0 && disponible < gastosFijos * 0.1) {
     alertas.push({

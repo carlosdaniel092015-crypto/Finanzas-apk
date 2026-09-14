@@ -8,7 +8,7 @@ import { Deudas } from '@/views/Deudas'
 import { FlujoCaja } from '@/views/FlujoCaja'
 import { Login } from '@/views/Login'
 import { supabase, supabaseConfigurado } from '@/lib/supabase'
-import { useStore } from '@/store'
+import { useStore, useUI } from '@/store'
 
 const TITULOS: Record<Pestana, string> = {
   flujo: 'Control de Presupuesto',
@@ -21,6 +21,8 @@ export default function App() {
   const [invitado, setInvitado] = useState(false)
   const [authLista, setAuthLista] = useState(!supabaseConfigurado)
   const cargar = useStore((s) => s.cargar)
+  const formAbierto = useUI((s) => s.formAbierto)
+  const setFormAbierto = useUI((s) => s.setFormAbierto)
 
   useEffect(() => {
     if (!supabase) return
@@ -64,8 +66,14 @@ export default function App() {
           {pestana === 'flujo' ? <FlujoCaja /> : <Deudas />}
         </main>
 
-        <TarjetaDisponible onVerPlan={() => setPestana('deudas')} />
-        <BottomNav pestana={pestana} onCambiar={setPestana} />
+        {!formAbierto && <TarjetaDisponible onVerPlan={() => setPestana('deudas')} />}
+        <BottomNav
+          pestana={pestana}
+          onCambiar={(p) => {
+            setFormAbierto(false)
+            setPestana(p)
+          }}
+        />
       </div>
     </div>
   )

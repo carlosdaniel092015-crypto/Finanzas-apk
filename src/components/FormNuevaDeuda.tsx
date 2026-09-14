@@ -1,18 +1,29 @@
-import { useState } from 'react'
-import { FilePlus, X } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { FilePlus, TriangleAlert, X } from 'lucide-react'
 import { ETIQUETA_TIPO } from './iconos'
+import { formatMoney, formatMeses, type Moneda } from '@/lib/format'
+import { simularPlan } from '@/engine/plan'
 import type { Deuda, TipoDeuda, TipoTasa } from '@/engine/tipos'
 
 const CAMPO =
   'w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-900 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500'
 const ETIQUETA = 'text-[11px] font-bold text-slate-600 block mb-1'
+const OPCIONAL = 'text-[10px] font-medium text-slate-400 ml-1'
 
 const TIPOS = Object.keys(ETIQUETA_TIPO) as TipoDeuda[]
 
+/** Las tarjetas de aquí cobran ~30% variable desde el consumo, sin gracia. */
+const TASA_SUGERIDA: Partial<Record<TipoDeuda, { tasa: string; tipo: TipoTasa }>> = {
+  tarjeta: { tasa: '30', tipo: 'variable' },
+  linea_credito: { tasa: '30', tipo: 'variable' },
+}
+
 export function FormNuevaDeuda({
+  moneda,
   onGuardar,
   onCerrar,
 }: {
+  moneda: Moneda
   onGuardar: (d: Omit<Deuda, 'id'>) => void
   onCerrar: () => void
 }) {
@@ -20,18 +31,45 @@ export function FormNuevaDeuda({
   const [tipo, setTipo] = useState<TipoDeuda>('tarjeta')
   const [saldo, setSaldo] = useState('')
   const [cuota, setCuota] = useState('')
-  const [tasa, setTasa] = useState('')
-  const [tipoTasa, setTipoTasa] = useState<TipoTasa>('fija')
-  const [meses, setMeses] = useState('')
+  const [tasa, setTasa] = useState(TASA_SUGERIDA.tarjeta!.tasa)
+  const [tipoTasa, setTipoTasa] = useState<TipoTasa>(TASA_SUGERIDA.tarjeta!.tipo)
   const [limite, setLimite] = useState('')
-  const [minimoPct, setMinimoPct] = useState('')
+  const [diaPago, setDiaPago] = useState('')
+  const [diaCorte, setDiaCorte] = useState('')
+  const [ultimoPago, setUltimoPago] = useState('')
 
   const esTarjeta = tipo === 'tarjeta' || tipo === 'linea_credito'
+
+  function cambiarTipo(nuevo: TipoDeuda) {
+    setTipo(nuevo)
+    const sugerida = TASA_SUGERIDA[nuevo]
+    if (sugerida) {
+      setTasa(sugerida.tasa)
+      setTipoTasa(sugerida.tipo)
+    }
+  }
+
+  // Aviso en vivo: con una cuota fija, si no cubre el interés del mes la deuda
+  // NUNCA se paga. A 30% anual eso pasa por debajo del 2.5% del saldo, que es
+  // más alto de lo que la gente supone.
+  const proyeccion = useMemo(() => {
+    const s = parseFloat(saldo) || 0
+    const c = parseFloat(cuota) || 0
+    const t = parseFloat(tasa) || 0
+    if (s <= 0 || c <= 0) return null
+    const interesMes = (s * t) / 100 / 12
+    const r = simularPlan(
+      [{ id: 'tmp', nombre, tipo, saldo: s, tasaAnual: t, tipoTasa, cuotaMensual: c }],
+      { estrategia: 'avalancha', excedenteMensual: 0 },
+    )
+    return { interesMes, resultado: r }
+  }, [saldo, cuota, tasa, tipoTasa, tipo, nombre])
 
   function enviar(e: React.FormEvent) {
     e.preventDefault()
     const saldoNum = parseFloat(saldo) || 0
-    if (!nombre.trim() || saldoNum <= 0) return
+    const cuotaNum = parseFloat(cuota) || 0
+    if (!nombre.trim() || saldoNum <= 0 || cuotaNum <= 0) return
 
     onGuardar({
       nombre: nombre.trim(),
@@ -39,10 +77,11 @@ export function FormNuevaDeuda({
       saldo: saldoNum,
       tasaAnual: parseFloat(tasa) || 0,
       tipoTasa,
-      cuotaMensual: parseFloat(cuota) || 0,
-      pagoMinimoPct: esTarjeta ? parseFloat(minimoPct) || undefined : undefined,
+      cuotaMensual: cuotaNum,
       limiteCredito: esTarjeta ? parseFloat(limite) || undefined : undefined,
-      mesesRestantes: parseInt(meses, 10) || undefined,
+      diaPago: parseInt(diaPago, 10) || undefined,
+      diaCorte: esTarjeta ? parseInt(diaCorte, 10) || undefined : undefined,
+      fechaUltimoPago: ultimoPago || undefined,
     })
   }
 
@@ -90,7 +129,7 @@ export function FormNuevaDeuda({
           <select
             id="d-tipo"
             value={tipo}
-            onChange={(e) => setTipo(e.target.value as TipoDeuda)}
+            onChange={(e) => cambiarTipo(e.target.value as TipoDeuda)}
             className={CAMPO}
           >
             {TIPOS.map((t) => (
@@ -115,23 +154,24 @@ export function FormNuevaDeuda({
               step="any"
               value={saldo}
               onChange={(e) => setSaldo(e.target.value)}
-              placeholder="Ej. 4500"
+              placeholder="Ej. 50000"
               className={CAMPO}
             />
           </div>
           <div>
             <label className={ETIQUETA} htmlFor="d-cuota">
-              Cuota Mensual ($)
+              Cuota Fija Mensual ($)
             </label>
             <input
               id="d-cuota"
               type="number"
               inputMode="decimal"
-              min="0"
+              required
+              min="1"
               step="any"
               value={cuota}
               onChange={(e) => setCuota(e.target.value)}
-              placeholder="Ej. 250"
+              placeholder="Ej. 5000"
               className={CAMPO}
             />
           </div>
@@ -151,7 +191,7 @@ export function FormNuevaDeuda({
               step="0.1"
               value={tasa}
               onChange={(e) => setTasa(e.target.value)}
-              placeholder="Ej. 24.5"
+              placeholder="Ej. 30"
               className={CAMPO}
             />
           </div>
@@ -171,67 +211,124 @@ export function FormNuevaDeuda({
           </div>
         </div>
 
+        {esTarjeta && (
+          <p className="text-[11px] text-slate-600 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 leading-relaxed">
+            El interés de la tarjeta corre <strong>desde el consumo</strong>, sin período de
+            gracia: así se calcula aquí.
+          </p>
+        )}
+
         {tipoTasa === 'variable' && (
           <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 leading-relaxed">
-            Con tasa variable el plan se calcula también en escenarios de subida, para que sepas
+            Con tasa variable el plan también se calcula en escenarios de subida, para que sepas
             cuánto se te movería la fecha si el índice sube.
           </p>
         )}
 
-        {esTarjeta ? (
-          <div className="grid grid-cols-2 gap-2.5">
-            <div>
-              <label className={ETIQUETA} htmlFor="d-limite">
-                Límite de Crédito ($)
-              </label>
-              <input
-                id="d-limite"
-                type="number"
-                inputMode="decimal"
-                min="0"
-                step="any"
-                value={limite}
-                onChange={(e) => setLimite(e.target.value)}
-                placeholder="Ej. 150000"
-                className={CAMPO}
-              />
-            </div>
-            <div>
-              <label className={ETIQUETA} htmlFor="d-min">
-                Pago Mínimo (%)
-              </label>
-              <input
-                id="d-min"
-                type="number"
-                inputMode="decimal"
-                min="0"
-                max="100"
-                step="0.1"
-                value={minimoPct}
-                onChange={(e) => setMinimoPct(e.target.value)}
-                placeholder="Ej. 5"
-                className={CAMPO}
-              />
-            </div>
+        {/* Proyección en vivo de esta deuda sola */}
+        {proyeccion && (
+          <div
+            className={`rounded-xl px-3 py-2.5 border text-[11px] leading-relaxed ${
+              proyeccion.resultado.insostenible
+                ? 'bg-rose-50 border-rose-200 text-rose-900'
+                : 'bg-emerald-50 border-emerald-200 text-emerald-900'
+            }`}
+          >
+            {proyeccion.resultado.insostenible ? (
+              <div className="flex items-start gap-2">
+                <TriangleAlert className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>
+                  <strong>Esta cuota no paga nunca la deuda.</strong> El interés del primer mes es{' '}
+                  {formatMoney(proyeccion.interesMes, moneda)} y estás abonando{' '}
+                  {formatMoney(parseFloat(cuota) || 0, moneda)}. El saldo crece cada mes.
+                </span>
+              </div>
+            ) : (
+              <span>
+                Con esta cuota sola, esta deuda se salda en{' '}
+                <strong>{formatMeses(proyeccion.resultado.meses)}</strong> y pagarías{' '}
+                <strong>{formatMoney(proyeccion.resultado.interesTotal, moneda)}</strong> de
+                interés. El plan la acelera con tu dinero disponible.
+              </span>
+            )}
           </div>
-        ) : (
+        )}
+
+        {esTarjeta && (
           <div>
-            <label className={ETIQUETA} htmlFor="d-meses">
-              Tiempo Restante (meses)
+            <label className={ETIQUETA} htmlFor="d-limite">
+              Límite de Crédito ($)<span className={OPCIONAL}>opcional</span>
             </label>
             <input
-              id="d-meses"
+              id="d-limite"
               type="number"
-              inputMode="numeric"
-              min="1"
-              max="600"
-              value={meses}
-              onChange={(e) => setMeses(e.target.value)}
-              placeholder="Ej. 18"
+              inputMode="decimal"
+              min="0"
+              step="any"
+              value={limite}
+              onChange={(e) => setLimite(e.target.value)}
+              placeholder="Ej. 150000"
               className={CAMPO}
             />
           </div>
         )}
+
+        {/* Fechas: todas opcionales. Alimentan los recordatorios. */}
+        <div className="pt-1 border-t border-slate-100 space-y-2.5">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 pt-1">
+            Fechas <span className="normal-case font-medium">— opcionales, para los recordatorios</span>
+          </p>
+
+          <div className={esTarjeta ? 'grid grid-cols-2 gap-2.5' : ''}>
+            <div>
+              <label className={ETIQUETA} htmlFor="d-diapago">
+                Día de Pago
+              </label>
+              <input
+                id="d-diapago"
+                type="number"
+                inputMode="numeric"
+                min="1"
+                max="31"
+                value={diaPago}
+                onChange={(e) => setDiaPago(e.target.value)}
+                placeholder="Ej. 5"
+                className={CAMPO}
+              />
+            </div>
+            {esTarjeta && (
+              <div>
+                <label className={ETIQUETA} htmlFor="d-diacorte">
+                  Día de Corte
+                </label>
+                <input
+                  id="d-diacorte"
+                  type="number"
+                  inputMode="numeric"
+                  min="1"
+                  max="31"
+                  value={diaCorte}
+                  onChange={(e) => setDiaCorte(e.target.value)}
+                  placeholder="Ej. 28"
+                  className={CAMPO}
+                />
+              </div>
+            )}
+          </div>
+
+          <div>
+            <label className={ETIQUETA} htmlFor="d-ultimopago">
+              Fecha del Último Pago
+            </label>
+            <input
+              id="d-ultimopago"
+              type="date"
+              value={ultimoPago}
+              onChange={(e) => setUltimoPago(e.target.value)}
+              className={CAMPO}
+            />
+          </div>
+        </div>
 
         <div className="flex items-center gap-2 pt-1">
           <button

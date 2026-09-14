@@ -1,6 +1,7 @@
-import { Trash2 } from 'lucide-react'
+import { CalendarClock, Trash2 } from 'lucide-react'
 import { Icono, ICONO_POR_TIPO } from './iconos'
 import { formatMoney, type Moneda } from '@/lib/format'
+import { diasHasta, mesesDesde, proximoPago, textoVencimiento } from '@/lib/fechas'
 import { pagoMinimo } from '@/engine/plan'
 import type { Deuda } from '@/engine/tipos'
 
@@ -20,6 +21,10 @@ export function TarjetaDeuda({
     deuda.limiteCredito && deuda.limiteCredito > 0
       ? (deuda.saldo / deuda.limiteCredito) * 100
       : null
+
+  const proximo = proximoPago(deuda.diaPago)
+  const dias = proximo ? diasHasta(proximo) : null
+  const sinPagarHace = mesesDesde(deuda.fechaUltimoPago)
 
   return (
     <div
@@ -80,6 +85,30 @@ export function TarjetaDeuda({
         )}
       </div>
 
+      {(proximo || sinPagarHace !== null) && (
+        <div className="flex items-center gap-2 flex-wrap mb-0.5">
+          {proximo && dias !== null && (
+            <span
+              className={`inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                dias < 0
+                  ? 'text-rose-700 bg-rose-50'
+                  : dias <= 3
+                    ? 'text-amber-700 bg-amber-50'
+                    : 'text-slate-500 bg-slate-50'
+              }`}
+            >
+              <CalendarClock className="w-3 h-3" />
+              Día {deuda.diaPago} · {textoVencimiento(dias)}
+            </span>
+          )}
+          {sinPagarHace !== null && sinPagarHace >= 2 && (
+            <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded">
+              sin pagar hace {sinPagarHace} meses
+            </span>
+          )}
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 mt-2">
         <div>
           <span className="text-[10px] text-slate-400 uppercase font-semibold block">
@@ -91,7 +120,7 @@ export function TarjetaDeuda({
         </div>
         <div className="text-right">
           <span className="text-[10px] text-slate-400 uppercase font-semibold block">
-            Cuota Mensual
+            Cuota Fija
           </span>
           <span className="text-sm font-extrabold text-emerald-700">
             {formatMoney(cuota, moneda)}/m
