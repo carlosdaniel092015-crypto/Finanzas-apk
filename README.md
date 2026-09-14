@@ -141,6 +141,58 @@ costo por uso, y es opcional.
 
 ---
 
+---
+
+## 6. Cómo correrlo
+
+```bash
+npm install
+npm run dev        # http://localhost:5173
+npm test           # 35 tests del motor y los formateadores
+npm run build      # bundle de produccion en dist/
+```
+
+**Sin Supabase configurado la app corre igual, en MODO LOCAL** (todo se guarda en el
+dispositivo). Cuando pongas `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY` en `.env`
+aparece la pantalla de login y los datos empiezan a sincronizar. La copia local se
+mantiene siempre como respaldo: el APK sigue funcionando sin señal.
+
+### APK
+
+```bash
+npm run cap:sync   # build + copia el bundle al proyecto Android
+npm run cap:open   # abre Android Studio (requiere SDK local)
+```
+
+En CI no hace falta nada de eso: el workflow **`.github/workflows/android.yml`** compila
+el APK. Corre a mano desde la pestaña Actions, o empujando un tag:
+
+```bash
+git tag v1.0.0 && git push --tags
+```
+
+El APK queda como artefacto de la corrida y, si fue un tag, adjunto al Release.
+Con los secrets del keystore sale **firmado**; sin ellos sale un APK **debug**, que
+Android instala igual pero no sirve para publicar actualizaciones.
+
+---
+
+## 7. Estado actual
+
+| Pieza | Estado |
+|---|---|
+| Motor de salida de deudas + alertas | ✅ 35 tests en verde |
+| Módulo Flujo de Caja (ingresos, 7 gastos fijos, disponible en vivo) | ✅ |
+| Módulo Deudas (alta, listado, objetivo, totales) | ✅ |
+| Plan inteligente + comparador + escenarios de tasa variable | ✅ |
+| Persistencia local + PWA instalable | ✅ |
+| Login y sincronización Supabase | ✅ código listo, **falta conectar el proyecto** |
+| Proyecto Android + workflow del APK | ✅ generado, **build de gradle sin verificar** (necesita el SDK, corre en CI) |
+| Recordatorios con notificaciones locales | ⏳ Fase 4 |
+| Reportes y capa de IA | ⏳ Fases 6 |
+
+---
+
 ## Documentos
 - **`docs/ACCESOS.md`** — qué necesito de ti para arrancar.
 - **`docs/ESQUEMA.sql`** — base de datos completa con RLS, lista para pegar en Supabase.
