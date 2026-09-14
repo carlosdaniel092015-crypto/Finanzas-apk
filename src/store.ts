@@ -6,6 +6,8 @@ import type { Moneda } from '@/lib/format'
 
 interface Store extends EstadoFinanciero {
   cargando: boolean
+  errorSync: string | null
+  descartarError: () => void
   cargar: () => Promise<void>
   setIngreso: (monto: number) => void
   setMoneda: (moneda: Moneda) => void
@@ -19,12 +21,18 @@ interface Store extends EstadoFinanciero {
 
 /** Escribir en cada tecla pegaria a la red sin razon; agrupamos. */
 let temporizador: ReturnType<typeof setTimeout> | undefined
+let onError: ((mensaje: string) => void) | undefined
 function guardarDiferido(estado: EstadoFinanciero) {
   clearTimeout(temporizador)
   temporizador = setTimeout(() => {
-    void repo.guardar(estado).catch(() => {
-      /* sin red: ya quedo la copia local */
-    })
+    void repo
+      .guardar(estado)
+      .then(({ error }) => {
+        if (error) onError?.(error)
+      })
+      .catch(() => {
+        /* sin red: ya quedo la copia local */
+      })
   }, 600)
 }
 
@@ -42,10 +50,14 @@ export const useStore = create<Store>((set, get) => {
   return {
     ...ESTADO_INICIAL,
     cargando: true,
+    errorSync: null,
+
+    descartarError: () => set({ errorSync: null }),
 
     async cargar() {
-      const guardado = await repo.cargar()
-      set({ ...(guardado ?? ESTADO_INICIAL), cargando: false })
+      onError = (mensaje) => set({ errorSync: mensaje })
+      const { estado, error } = await repo.cargar()
+      set({ ...(estado ?? ESTADO_INICIAL), cargando: false, errorSync: error ?? null })
     },
 
     setIngreso: (ingresoMensual) => mutar({ ingresoMensual: Math.max(0, ingresoMensual) }),

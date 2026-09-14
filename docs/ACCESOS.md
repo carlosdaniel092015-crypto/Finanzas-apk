@@ -1,4 +1,39 @@
-# Lo que necesito de ti para arrancar
+# Accesos: qué está listo y qué falta
+
+> **Estado al día de hoy**
+>
+> | | |
+> |---|---|
+> | Proyecto Supabase | ✅ `sqskqdahlbgzjorpmmxe` · URL y anon key ya configuradas en `.env.production` |
+> | Esquema SQL aplicado | ❓ **sin verificar** — corre `npm run verificar:supabase` |
+> | GitHub | ✅ rama `claude/finance-debt-plan-app-myxkwo` |
+> | Vercel | ⬜ falta importar el repo |
+> | Keystore Android | ⬜ falta |
+>
+> La anon key **se commitea a propósito**: es pública por diseño (viaja en el bundle
+> de cualquier despliegue web y dentro del APK). Lo que protege tus datos es el RLS
+> del esquema, no esconderla. Así Vercel y el CI compilan sin configurar nada.
+> Si algún día quieres rotarla: Supabase → Settings → API → Roll anon key, y
+> cambias el valor en `.env.production`.
+
+---
+
+## Verifica el esquema antes que nada
+
+```bash
+npm run verificar:supabase
+```
+
+Te dice tabla por tabla si existe y si el RLS está bloqueando al anónimo. Si sale
+que faltan tablas, abre el **SQL Editor** de Supabase, pega `docs/ESQUEMA.sql`
+completo y dale Run.
+
+> Ese comando hay que correrlo **desde tu máquina**. Desde una red corporativa con
+> proxy puede dar 403 y eso no significa que Supabase esté mal.
+
+---
+
+# Lo que necesito de ti
 
 Ordenado por lo que bloquea más. **Nada de esto requiere que me des tu contraseña personal
 de ninguna cuenta.** Todo son tokens revocables o valores públicos.
@@ -7,8 +42,18 @@ de ninguna cuenta.** Todo son tokens revocables o valores públicos.
 
 ## 🟥 BLOQUEA LA FASE 0 — sin esto no puedo empezar
 
-### 1. Supabase
-Crea el proyecto (5 min): https://supabase.com → New project
+### 1. Supabase — ✅ hecho, falta confirmar el esquema
+Proyecto: `sqskqdahlbgzjorpmmxe` · URL `https://sqskqdahlbgzjorpmmxe.supabase.co`
+
+Ya está configurado en el código. Solo falta:
+1. Correr `docs/ESQUEMA.sql` en el SQL Editor (si aún no lo hiciste)
+2. **Authentication → Providers → Email**: activado
+3. **Authentication → URL Configuration → Site URL**: la URL de Vercel cuando la tengas
+4. Verificar con `npm run verificar:supabase`
+
+<details><summary>Cómo se creó (referencia)</summary>
+
+https://supabase.com → New project
 - Nombre: `finanzas-apk`
 - Región: **East US (North Virginia)** — la más cercana a RD
 - Guarda bien la contraseña de la base de datos

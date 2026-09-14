@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
+import { AvisoSync } from '@/components/AvisoSync'
 import { BottomNav, type Pestana } from '@/components/BottomNav'
 import { Header } from '@/components/Header'
 import { TarjetaDisponible } from '@/components/TarjetaDisponible'
@@ -52,7 +53,12 @@ export default function App() {
   return (
     <div className="bg-slate-100 min-h-screen flex justify-center">
       <div className="w-full max-w-md min-h-screen bg-slate-50 flex flex-col relative shadow-2xl overflow-x-hidden border-x border-slate-200/80">
-        <Header titulo={TITULOS[pestana]} usuario={usuario} />
+        <Header
+          titulo={TITULOS[pestana]}
+          usuario={usuario}
+          sincronizando={supabaseConfigurado && Boolean(sesion)}
+        />
+        <AvisoSync />
 
         <main className="flex-1 px-4 pt-4 pb-56">
           {pestana === 'flujo' ? <FlujoCaja /> : <Deudas />}

@@ -1,7 +1,15 @@
 import { ShieldCheck } from 'lucide-react'
-import { supabaseConfigurado } from '@/lib/supabase'
 
-export function Header({ titulo, usuario }: { titulo: string; usuario: string }) {
+export function Header({
+  titulo,
+  usuario,
+  sincronizando,
+}: {
+  titulo: string
+  usuario: string
+  /** false en modo invitado: el badge no puede prometer nube si no la hay. */
+  sincronizando: boolean
+}) {
   const iniciales =
     usuario
       .split(/\s+/)
@@ -27,9 +35,17 @@ export function Header({ titulo, usuario }: { titulo: string; usuario: string })
       <div className="flex items-center gap-2">
         <div className="text-right hidden sm:block">
           <p className="text-[11px] font-semibold text-slate-500">{usuario}</p>
-          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200/60">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-            {supabaseConfigurado ? 'Sincronizado' : 'Modo local'}
+          <span
+            className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+              sincronizando
+                ? 'text-emerald-600 bg-emerald-50 border-emerald-200/60'
+                : 'text-slate-500 bg-slate-100 border-slate-200'
+            }`}
+          >
+            <span
+              className={`w-1.5 h-1.5 rounded-full ${sincronizando ? 'bg-emerald-500' : 'bg-slate-400'}`}
+            />
+            {sincronizando ? 'Sincronizado' : 'Modo local'}
           </span>
         </div>
         <div className="w-9 h-9 rounded-full bg-slate-200/80 border border-slate-300/80 flex items-center justify-center text-slate-700 font-bold text-xs">

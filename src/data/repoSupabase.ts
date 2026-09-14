@@ -51,6 +51,15 @@ const aFila = (d: Deuda, userId: string) => ({
   prioridad_manual: d.prioridadManual ?? null,
 })
 
+/** Traduce el error de una consulta a algo que el usuario pueda accionar. */
+function perfiles_err(r: { error: { message: string; code?: string } | null }): string | null {
+  if (!r.error) return null
+  if (r.error.code === '42P01' || /does not exist|Could not find the table/i.test(r.error.message)) {
+    return 'Las tablas no existen todavía: corre docs/ESQUEMA.sql en el SQL Editor de Supabase.'
+  }
+  return `No se pudo sincronizar: ${r.error.message}`
+}
+
 async function usuarioActual(): Promise<string | null> {
   if (!supabase) return null
   const { data } = await supabase.auth.getUser()
@@ -84,6 +93,14 @@ export const repoSupabase: Repo = {
         .eq('activo', true),
     ])
 
+    // Si el esquema no esta aplicado, Postgres responde 42P01 y sin este aviso
+    // la app se veria simplemente "vacia", que es el sintoma mas confuso posible.
+    const fallo = [perfiles_err(perfil), perfiles_err(deudas), perfiles_err(recurrentes)].find(Boolean)
+    if (fallo) {
+      const local = await repoLocal.cargar()
+      return { estado: local.estado, error: fallo }
+    }
+
     const ingreso = (recurrentes.data ?? [])
       .filter((r) => r.tipo === 'ingreso')
       .reduce((s, r) => s + (Number(r.monto_estimado) || 0), 0)
@@ -98,11 +115,13 @@ export const repoSupabase: Repo = {
     })
 
     return {
-      ...ESTADO_INICIAL,
-      moneda: (perfil.data?.moneda as EstadoFinanciero['moneda']) ?? 'DOP',
-      ingresoMensual: ingreso,
-      gastosFijos: gastos,
-      deudas: (deudas.data ?? []).map((f) => aDeuda(f as FilaDeuda)),
+      estado: {
+        ...ESTADO_INICIAL,
+        moneda: (perfil.data?.moneda as EstadoFinanciero['moneda']) ?? 'DOP',
+        ingresoMensual: ingreso,
+        gastosFijos: gastos,
+        deudas: (deudas.data ?? []).map((f) => aDeuda(f as FilaDeuda)),
+      },
     }
   },
 
@@ -110,12 +129,17 @@ export const repoSupabase: Repo = {
     const userId = await usuarioActual()
     // Siempre dejamos copia local: es el respaldo si el APK esta sin red.
     await repoLocal.guardar(estado)
-    if (!supabase || !userId) return
+    if (!supabase || !userId) return {}
+    const errores: string[] = []
 
-    await supabase.from('perfiles').upsert({ id: userId, moneda: estado.moneda })
+    const anotar = (r: { error: { message: string } | null }) => {
+      if (r.error) errores.push(r.error.message)
+    }
+
+    anotar(await supabase.from('perfiles').upsert({ id: userId, moneda: estado.moneda }))
 
     if (estado.deudas.length > 0) {
-      await supabase.from('deudas').upsert(estado.deudas.map((d) => aFila(d, userId)))
+      anotar(await supabase.from('deudas').upsert(estado.deudas.map((d) => aFila(d, userId))))
     }
 
     // Las deudas borradas en la app se marcan pagadas, no se destruyen:
@@ -123,7 +147,7 @@ export const repoSupabase: Repo = {
     const vivas = estado.deudas.map((d) => d.id)
     let q = supabase.from('deudas').update({ estado: 'pagada' }).eq('user_id', userId)
     if (vivas.length > 0) q = q.not('id', 'in', `(${vivas.join(',')})`)
-    await q.eq('estado', 'activa')
+    anotar(await q.eq('estado', 'activa'))
 
     const filasRecurrentes = [
       ...estado.gastosFijos
@@ -150,9 +174,13 @@ export const repoSupabase: Repo = {
         : []),
     ]
     if (filasRecurrentes.length > 0) {
-      await supabase
-        .from('recurrentes')
-        .upsert(filasRecurrentes, { onConflict: 'user_id,nombre' })
+      anotar(
+        await supabase
+          .from('recurrentes')
+          .upsert(filasRecurrentes, { onConflict: 'user_id,nombre' }),
+      )
     }
+
+    return errores.length > 0 ? { error: errores[0] } : {}
   },
 }

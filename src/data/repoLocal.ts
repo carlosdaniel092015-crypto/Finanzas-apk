@@ -13,21 +13,23 @@ export const repoLocal: Repo = {
   async cargar() {
     try {
       const crudo = localStorage.getItem(CLAVE)
-      if (!crudo) return null
+      if (!crudo) return { estado: null }
       const datos = JSON.parse(crudo) as Partial<EstadoFinanciero>
       // Mezcla defensiva: un estado guardado por una version vieja no debe
       // dejar la app sin gastos ni moneda.
-      return { ...ESTADO_INICIAL, ...datos } as EstadoFinanciero
+      return { estado: { ...ESTADO_INICIAL, ...datos } as EstadoFinanciero }
     } catch {
-      return null
+      return { estado: null }
     }
   },
 
   async guardar(estado) {
     try {
       localStorage.setItem(CLAVE, JSON.stringify(estado))
+      return {}
     } catch {
       // Cuota llena o modo privado: no vale la pena tumbar la UI por esto.
+      return {}
     }
   },
 }
