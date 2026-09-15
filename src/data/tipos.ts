@@ -146,7 +146,9 @@ export function migrarEstado(guardado: Record<string, unknown>): EstadoFinancier
   if (base.ingresos.length === 0 && ingresoViejo > 0) {
     base.ingresos = [
       {
-        id: 'migrado-ingreso',
+        // uuid obligatorio: la columna de Postgres lo es, y un id como
+        // "migrado-ingreso" hace fallar el INSERT de TODA la sincronizacion.
+        id: crypto.randomUUID(),
         descripcion: 'Sueldo',
         tipo: 'sueldo',
         monto: ingresoViejo,
@@ -163,8 +165,8 @@ export function migrarEstado(guardado: Record<string, unknown>): EstadoFinancier
     }
     base.gastos = (gastosViejos as Record<string, unknown>[])
       .filter((g) => (Number(g.monto) || 0) > 0)
-      .map((g, i) => ({
-        id: `migrado-gasto-${i}`,
+      .map((g) => ({
+        id: crypto.randomUUID(),
         descripcion: String(g.nombre ?? 'Gasto'),
         categoria: CATEGORIA_POR_ICONO[String(g.icono)] ?? 'otro',
         monto: Number(g.monto) || 0,

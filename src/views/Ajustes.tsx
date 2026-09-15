@@ -45,6 +45,7 @@ export function Ajustes({
   const { ingreso, totalGastos, disponible } = useFlujoCaja()
 
   const [permiso, setPermiso] = useState<EstadoPermiso>('sin-pedir')
+  const [avisoNotif, setAvisoNotif] = useState<string | null>(null)
   const [programados, setProgramados] = useState<number | null>(null)
   const [token, setToken] = useState<string | null>(null)
   const [cargandoBuzon, setCargandoBuzon] = useState(true)
@@ -69,15 +70,48 @@ export function Ajustes({
   ]
 
   async function alternarNotificaciones() {
+    setAvisoNotif(null)
+    try {
+      await alternarNotificacionesInterno()
+    } catch (e) {
+      // Sin esto la promesa rechazada se la traga el `void` del onClick y el
+      // boton parece no hacer nada, que es justo el sintoma que se reporto.
+      setAvisoNotif(
+        `No se pudieron activar: ${e instanceof Error ? e.message : String(e)}`,
+      )
+    }
+  }
+
+  async function alternarNotificacionesInterno() {
+
     if (notificaciones) {
       await cancelarTodos()
       setNotificaciones(false)
       setProgramados(null)
       return
     }
-    const ok = (await estadoPermiso()) === 'concedido' || (await pedirPermiso())
-    setPermiso(await estadoPermiso())
-    if (!ok) return
+
+    const antes = await estadoPermiso()
+    if (antes === 'no-soportado') {
+      setPermiso(antes)
+      setAvisoNotif('Este navegador no permite notificaciones. En el APK sí funcionan.')
+      return
+    }
+
+    const concedido = antes === 'concedido' || (await pedirPermiso())
+    const despues = await estadoPermiso()
+    setPermiso(despues)
+
+    // Quedarse callado aqui es lo que hace parecer que el boton no sirve.
+    if (!concedido) {
+      setAvisoNotif(
+        despues === 'denegado'
+          ? 'Bloqueaste las notificaciones para este sitio. Hay que permitirlas desde el candado de la barra de direcciones; desde aquí no se puede.'
+          : 'Cerraste el permiso sin decidir. Vuelve a tocar el botón y elige "Permitir".',
+      )
+      return
+    }
+
     setNotificaciones(true)
     await reprogramar()
   }
@@ -87,7 +121,8 @@ export function Ajustes({
       formatoMonto: (n) => formatMoney(n, moneda),
     })
     await cancelarTodos()
-    setProgramados(await programar(items))
+    await programar(items)
+    setProgramados(items.length)
   }
 
   async function copiar(texto: string) {
@@ -175,10 +210,15 @@ export function Ajustes({
               </span>
             </button>
 
-            {permiso === 'denegado' && (
-              <p className="text-[11px] text-rose-800 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2 leading-relaxed">
-                Bloqueaste las notificaciones para esta app. Hay que volver a permitirlas desde los
-                ajustes del sistema; desde aquí no se puede.
+            {avisoNotif && (
+              <p
+                className={`text-[11px] rounded-xl px-3 py-2 leading-relaxed border ${
+                  permiso === 'denegado'
+                    ? 'text-rose-800 bg-rose-50 border-rose-200'
+                    : 'text-amber-800 bg-amber-50 border-amber-200'
+                }`}
+              >
+                {avisoNotif}
               </p>
             )}
 
@@ -199,10 +239,18 @@ export function Ajustes({
                   </button>
                 </div>
                 {programados !== null && (
-                  <p className="text-[11px] text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2">
-                    {programados > 0
-                      ? `${programados} avisos programados para los próximos 3 meses.`
-                      : 'No hay nada que avisar: ponle día de pago a tus deudas y gastos.'}
+                  <p className="text-[11px] text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 leading-relaxed">
+                    {programados === 0 ? (
+                      'No hay nada que avisar todavía: ponle día de pago a tus deudas y a tus gastos, y vuelve a tocar Reprogramar.'
+                    ) : esNativo() ? (
+                      `${programados} avisos agendados para los próximos 3 meses.`
+                    ) : (
+                      <>
+                        {programados} avisos preparados para los próximos 3 meses. En el navegador
+                        te aparecen <strong>al abrir la app</strong>; instálala como APK para que
+                        suenen solos.
+                      </>
+                    )}
                   </p>
                 )}
               </>
