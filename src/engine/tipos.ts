@@ -36,6 +36,19 @@ export interface Deuda {
   diaCorte?: number
   /** Fecha del ultimo pago registrado, ISO "AAAA-MM-DD". Opcional. */
   fechaUltimoPago?: string
+  /** Monto con el que arranco la deuda, para medir cuanto llevas pagado */
+  montoOriginal?: number
+  /** Plazo: cuantas cuotas tiene el prestamo en total */
+  plazoMesesTotal?: number
+  /** Cuando empezo, ISO "AAAA-MM-DD" */
+  fechaInicio?: string
+  /**
+   * Cuando se dio de alta en la app. Es el ancla del devengo cuando no hay
+   * ninguna otra fecha: sin esto el interes entre pagos saldria siempre cero.
+   */
+  fechaRegistro?: string
+  /** Cuando termina segun contrato, ISO "AAAA-MM-DD" */
+  fechaFin?: string
   /** Solo informativo / para mostrar */
   mesesRestantes?: number
   limiteCredito?: number
@@ -98,4 +111,28 @@ export interface ResultadoPlan {
   /** true cuando el presupuesto no alcanza para cubrir ni siquiera los intereses */
   insostenible: boolean
   advertencias: string[]
+}
+
+export type TipoMovimiento = 'pago' | 'consumo' | 'reenganche' | 'ajuste'
+
+/**
+ * Un hecho real ocurrido sobre una deuda. El saldo de una deuda NO se edita a
+ * mano: se mueve solo a traves de estos registros, para que siempre se pueda
+ * responder "por que debo esto".
+ */
+export interface MovimientoDeuda {
+  id: string
+  deudaId: string
+  tipo: TipoMovimiento
+  /** ISO "AAAA-MM-DD" */
+  fecha: string
+  /** Siempre positivo. Lo que significa depende del tipo. */
+  monto: number
+  /** Solo en 'pago': cuanto se fue en intereses */
+  interes?: number
+  /** Solo en 'pago': cuanto bajo realmente la deuda */
+  capital?: number
+  /** Saldo que quedo despues de aplicarlo */
+  saldoDespues: number
+  nota?: string
 }

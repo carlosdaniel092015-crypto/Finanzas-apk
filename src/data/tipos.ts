@@ -1,7 +1,7 @@
-import type { Deuda, Estrategia } from '@/engine/tipos'
+import type { Deuda, Estrategia, MovimientoDeuda } from '@/engine/tipos'
 import type { Moneda } from '@/lib/format'
 
-export type { Deuda, Estrategia }
+export type { Deuda, Estrategia, MovimientoDeuda }
 
 /** Un renglon de gasto fijo del modulo de Flujo de Caja. */
 export interface GastoFijo {
@@ -25,6 +25,8 @@ export interface EstadoFinanciero {
   ingresoMensual: number
   gastosFijos: GastoFijo[]
   deudas: Deuda[]
+  /** Historial de hechos sobre las deudas: pagos, consumos, reenganches, ajustes */
+  movimientos: MovimientoDeuda[]
   estrategia: Estrategia
 }
 
@@ -43,5 +45,6 @@ export const ESTADO_INICIAL: EstadoFinanciero = {
   ingresoMensual: 0,
   gastosFijos: GASTOS_POR_DEFECTO,
   deudas: [],
+  movimientos: [],
   estrategia: 'avalancha',
 }

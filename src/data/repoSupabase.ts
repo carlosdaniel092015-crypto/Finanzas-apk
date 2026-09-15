@@ -123,6 +123,10 @@ export const repoSupabase: Repo = {
         : base
     })
 
+    // Los movimientos viven en la copia local: son el historial que el usuario
+    // ya confirmo, y no queremos perderlos si una tabla remota falla.
+    const local = await repoLocal.cargar()
+
     return {
       estado: {
         ...ESTADO_INICIAL,
@@ -130,6 +134,7 @@ export const repoSupabase: Repo = {
         ingresoMensual: ingreso,
         gastosFijos: gastos,
         deudas: (deudas.data ?? []).map((f) => aDeuda(f as FilaDeuda)),
+        movimientos: local.estado?.movimientos ?? [],
       },
     }
   },

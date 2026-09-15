@@ -1,41 +1,60 @@
 import { useMemo, useState } from 'react'
-import { ArrowRight, Layers, PlusCircle, Sparkles, Target } from 'lucide-react'
-import { FormNuevaDeuda } from '@/components/FormNuevaDeuda'
+import { ArrowRight, CalendarCheck, Layers, PlusCircle, Sparkles, Target, TrendingDown } from 'lucide-react'
+import { FormDeuda } from '@/components/FormDeuda'
+import { DetalleDeuda } from '@/components/DetalleDeuda'
 import { TarjetaDeuda } from '@/components/TarjetaDeuda'
 import { ResultadoPlan } from '@/components/ResultadoPlan'
 import { compararEstrategias, ordenarDeudas, pagoMinimo } from '@/engine/plan'
+import { hoyISO, interesDeLaCartera, pagosPendientes } from '@/engine/movimientos'
 import { analizar } from '@/engine/alertas'
 import { formatMoney } from '@/lib/format'
+import { textoVencimiento } from '@/lib/fechas'
 import { useFlujoCaja, useStore, useUI } from '@/store'
+import type { Deuda } from '@/engine/tipos'
 
 export function Deudas() {
-  const { moneda, deudas, estrategia, agregarDeuda, eliminarDeuda, setEstrategia } = useStore()
+  const {
+    moneda, deudas, movimientos, estrategia,
+    agregarDeuda, editarDeuda, eliminarDeuda, setEstrategia,
+    registrarMovimiento, deshacerMovimiento,
+  } = useStore()
   const { disponible, ingreso, totalGastos } = useFlujoCaja()
   const mostrarForm = useUI((s) => s.formAbierto)
   const setMostrarForm = useUI((s) => s.setFormAbierto)
+
+  const [editando, setEditando] = useState<Deuda | null>(null)
+  const [detalleId, setDetalleId] = useState<string | null>(null)
   const [planVisible, setPlanVisible] = useState(false)
+
+  const detalle = deudas.find((d) => d.id === detalleId) ?? null
 
   const totalDeuda = deudas.reduce((s, d) => s + d.saldo, 0)
   const totalCuotas = deudas.reduce((s, d) => s + (d.cuotaMensual || pagoMinimo(d, d.saldo)), 0)
 
-  const objetivoId = useMemo(
-    () => ordenarDeudas(deudas, estrategia)[0]?.id,
-    [deudas, estrategia],
+  const objetivoId = useMemo(() => ordenarDeudas(deudas, estrategia)[0]?.id, [deudas, estrategia])
+
+  const pendientes = useMemo(
+    () => pagosPendientes(deudas, movimientos, hoyISO()),
+    [deudas, movimientos],
   )
 
-  // El plan es una funcion pura de (deudas, excedente, estrategia): recalcular
-  // en cada cambio es barato y evita que la pantalla muestre datos viejos.
+  const interes = useMemo(() => interesDeLaCartera(deudas, movimientos), [deudas, movimientos])
+
   const comparacion = useMemo(
     () => (deudas.length > 0 ? compararEstrategias(deudas, { excedenteMensual: disponible }) : null),
     [deudas, disponible],
   )
-
   const elegido = comparacion?.resultados.find((r) => r.estrategia === estrategia) ?? null
 
   const alertas = useMemo(
     () => analizar({ ingresoMensual: ingreso, gastosFijos: totalGastos, deudas }),
     [ingreso, totalGastos, deudas],
   )
+
+  function cerrarForm() {
+    setMostrarForm(false)
+    setEditando(null)
+  }
 
   return (
     <section className="space-y-4">
@@ -46,7 +65,7 @@ export function Deudas() {
         </div>
         <button
           type="button"
-          onClick={() => setMostrarForm(!mostrarForm)}
+          onClick={() => { setEditando(null); setMostrarForm(!mostrarForm) }}
           className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-700/20 active:scale-95 transition shrink-0"
         >
           <PlusCircle className="w-4 h-4" />
@@ -55,14 +74,60 @@ export function Deudas() {
       </div>
 
       {mostrarForm && (
-        <FormNuevaDeuda
+        <FormDeuda
           moneda={moneda}
-          onCerrar={() => setMostrarForm(false)}
+          inicial={editando ?? undefined}
+          onCerrar={cerrarForm}
           onGuardar={(d) => {
-            agregarDeuda(d)
-            setMostrarForm(false)
+            if (editando) editarDeuda(editando.id, d)
+            else agregarDeuda(d)
+            cerrarForm()
           }}
         />
+      )}
+
+      {/* Pagos del ciclo que aún no están registrados. Un toque para confirmar. */}
+      {!mostrarForm && pendientes.length > 0 && (
+        <div className="bg-white rounded-2xl border border-amber-200 overflow-hidden">
+          <div className="px-4 py-2.5 bg-amber-50 border-b border-amber-200 flex items-center gap-2">
+            <CalendarCheck className="w-4 h-4 text-amber-700" />
+            <h3 className="text-xs font-bold text-amber-900">
+              {pendientes.length === 1 ? 'Un pago sin registrar' : `${pendientes.length} pagos sin registrar`}
+            </h3>
+          </div>
+          <div className="divide-y divide-slate-100">
+            {pendientes.map((p) => (
+              <div key={p.deuda.id} className="px-4 py-2.5 flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-xs font-bold text-slate-900 truncate">{p.deuda.nombre}</p>
+                  <p className="text-[10px] text-slate-500">
+                    {formatMoney(p.monto, moneda)} · {textoVencimiento(p.dias)}
+                  </p>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      registrarMovimiento(p.deuda.id, {
+                        tipo: 'pago', fecha: hoyISO(), monto: p.monto,
+                      })
+                    }
+                    className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-bold active:scale-95 transition"
+                  >
+                    Pagué
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDetalleId(p.deuda.id)}
+                    className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[11px] font-bold transition"
+                  >
+                    Otro monto
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
 
       {deudas.length === 0 && !mostrarForm ? (
@@ -84,7 +149,7 @@ export function Deudas() {
               deuda={d}
               moneda={moneda}
               esObjetivo={d.id === objetivoId}
-              onEliminar={eliminarDeuda}
+              onAbrir={() => setDetalleId(d.id)}
             />
           ))}
         </div>
@@ -112,6 +177,33 @@ export function Deudas() {
             </div>
           </div>
 
+          {/* Cuánto te ganan, de toda la cartera */}
+          <div className="bg-gradient-to-br from-slate-800 to-slate-900 text-white rounded-2xl p-4 space-y-2.5">
+            <div className="flex items-center gap-2">
+              <TrendingDown className="w-4 h-4 text-amber-400" />
+              <h3 className="text-xs font-extrabold uppercase tracking-wider text-amber-400">
+                Lo que te ganan de interés
+              </h3>
+            </div>
+            <p className="text-[11px] text-slate-300 leading-relaxed">
+              Solo en intereses les estás pagando{' '}
+              <strong className="text-amber-300 text-sm">{formatMoney(interes.esteMes, moneda)}</strong>{' '}
+              este mes. Eso no baja ni un peso de tu deuda.
+            </p>
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              <div className="bg-white/10 rounded-xl p-2.5">
+                <span className="text-[10px] text-slate-300 block">Ya les pagaste</span>
+                <span className="text-sm font-black text-white">{formatMoney(interes.pagado, moneda)}</span>
+              </div>
+              <div className="bg-white/10 rounded-xl p-2.5">
+                <span className="text-[10px] text-slate-300 block">Te falta pagarles</span>
+                <span className="text-sm font-black text-amber-300">
+                  {formatMoney(interes.proyectado, moneda)}
+                </span>
+              </div>
+            </div>
+          </div>
+
           <button
             type="button"
             onClick={() => setPlanVisible(true)}
@@ -124,8 +216,8 @@ export function Deudas() {
 
           {disponible === 0 && (
             <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 leading-relaxed">
-              Tu flujo de caja no deja excedente todavía. El plan se calcula igual con los pagos
-              mínimos, pero llena tus ingresos y gastos en la otra pestaña para ver cuánto puedes
+              Tu flujo de caja no deja excedente todavía. El plan se calcula igual con las cuotas
+              fijas, pero llena tus ingresos y gastos en la otra pestaña para ver cuánto puedes
               acelerar.
             </p>
           )}
@@ -142,6 +234,19 @@ export function Deudas() {
             />
           )}
         </>
+      )}
+
+      {detalle && (
+        <DetalleDeuda
+          deuda={detalle}
+          movimientos={movimientos}
+          moneda={moneda}
+          onCerrar={() => setDetalleId(null)}
+          onEditar={() => { setEditando(detalle); setDetalleId(null); setMostrarForm(true) }}
+          onEliminar={() => { eliminarDeuda(detalle.id); setDetalleId(null) }}
+          onMovimiento={(m) => registrarMovimiento(detalle.id, m)}
+          onDeshacer={deshacerMovimiento}
+        />
       )}
     </section>
   )

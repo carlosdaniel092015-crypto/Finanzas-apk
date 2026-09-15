@@ -1,4 +1,4 @@
-import { CalendarClock, Trash2 } from 'lucide-react'
+import { CalendarClock, ChevronRight } from 'lucide-react'
 import { Icono, ICONO_POR_TIPO } from './iconos'
 import { formatMoney, type Moneda } from '@/lib/format'
 import { diasHasta, mesesDesde, proximoPago, textoVencimiento } from '@/lib/fechas'
@@ -9,12 +9,12 @@ export function TarjetaDeuda({
   deuda,
   esObjetivo,
   moneda,
-  onEliminar,
+  onAbrir,
 }: {
   deuda: Deuda
   esObjetivo: boolean
   moneda: Moneda
-  onEliminar: (id: string) => void
+  onAbrir: () => void
 }) {
   const cuota = deuda.cuotaMensual || pagoMinimo(deuda, deuda.saldo)
   const uso =
@@ -27,8 +27,10 @@ export function TarjetaDeuda({
   const sinPagarHace = mesesDesde(deuda.fechaUltimoPago)
 
   return (
-    <div
-      className={`bg-white rounded-2xl p-4 border transition hover:border-emerald-400 ${
+    <button
+      type="button"
+      onClick={onAbrir}
+      className={`w-full text-left bg-white rounded-2xl p-4 border transition hover:border-emerald-400 active:scale-[0.99] ${
         esObjetivo
           ? 'border-emerald-300 ring-1 ring-emerald-400/40 shadow-sm'
           : 'border-slate-200/80 shadow-sm'
@@ -69,20 +71,14 @@ export function TarjetaDeuda({
           </div>
         </div>
 
-        {esObjetivo ? (
-          <span className="text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 whitespace-nowrap">
-            Objetivo #1
-          </span>
-        ) : (
-          <button
-            type="button"
-            onClick={() => onEliminar(deuda.id)}
-            aria-label={`Eliminar ${deuda.nombre}`}
-            className="text-slate-300 hover:text-rose-500 transition p-1"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-          </button>
-        )}
+        <div className="flex items-center gap-1 shrink-0">
+          {esObjetivo && (
+            <span className="text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 whitespace-nowrap">
+              Objetivo #1
+            </span>
+          )}
+          <ChevronRight className="w-4 h-4 text-slate-300" />
+        </div>
       </div>
 
       {(proximo || sinPagarHace !== null) && (
@@ -127,6 +123,6 @@ export function TarjetaDeuda({
           </span>
         </div>
       </div>
-    </div>
+    </button>
   )
 }

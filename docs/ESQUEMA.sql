@@ -100,6 +100,8 @@ create table deudas (
   cuota_mensual          numeric(14,2),
   dia_pago               smallint check (dia_pago between 1 and 31),   -- opcional
   fecha_ultimo_pago      date,                                          -- opcional
+  -- Alta en la app: ancla del devengo cuando no hay ultimo pago ni inicio
+  fecha_registro         date default current_date,
 
   -- Específico de tarjetas / líneas
   limite_credito         numeric(14,2),
