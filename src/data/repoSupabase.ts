@@ -18,6 +18,7 @@ interface FilaDeuda {
   plazo_meses_restantes: number | null
   limite_credito: number | null
   prioridad_manual: number | null
+  ultimos4: string | null
   dia_pago: number | null
   dia_corte: number | null
   fecha_ultimo_pago: string | null
@@ -36,6 +37,7 @@ const aDeuda = (f: FilaDeuda): Deuda => ({
   mesesRestantes: f.plazo_meses_restantes ?? undefined,
   limiteCredito: f.limite_credito ?? undefined,
   prioridadManual: f.prioridad_manual ?? undefined,
+  ultimos4: f.ultimos4 ?? undefined,
   diaPago: f.dia_pago ?? undefined,
   diaCorte: f.dia_corte ?? undefined,
   fechaUltimoPago: f.fecha_ultimo_pago ?? undefined,
@@ -55,6 +57,7 @@ const aFila = (d: Deuda, userId: string) => ({
   plazo_meses_restantes: d.mesesRestantes ?? null,
   limite_credito: d.limiteCredito ?? null,
   prioridad_manual: d.prioridadManual ?? null,
+  ultimos4: d.ultimos4 ?? null,
   dia_pago: d.diaPago ?? null,
   dia_corte: d.diaCorte ?? null,
   fecha_ultimo_pago: d.fechaUltimoPago ?? null,
@@ -91,7 +94,7 @@ export const repoSupabase: Repo = {
       supabase
         .from('deudas')
         .select(
-          'id,nombre,tipo,saldo_actual,tasa_anual,tipo_tasa,cuota_mensual,pago_minimo_pct,pago_minimo_piso,plazo_meses_restantes,limite_credito,prioridad_manual,dia_pago,dia_corte,fecha_ultimo_pago',
+          'id,nombre,tipo,saldo_actual,tasa_anual,tipo_tasa,cuota_mensual,pago_minimo_pct,pago_minimo_piso,plazo_meses_restantes,limite_credito,prioridad_manual,ultimos4,dia_pago,dia_corte,fecha_ultimo_pago',
         )
         .eq('user_id', userId)
         .eq('estado', 'activa'),

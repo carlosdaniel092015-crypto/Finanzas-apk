@@ -43,6 +43,7 @@ export function FormDeuda({
   const [tasa, setTasa] = useState(inicial ? String(inicial.tasaAnual) : (sug?.tasa ?? ''))
   const [tipoTasa, setTipoTasa] = useState<TipoTasa>(inicial?.tipoTasa ?? sug?.tipo ?? 'fija')
   const [limite, setLimite] = useState(txt(inicial?.limiteCredito))
+  const [ultimos4, setUltimos4] = useState(inicial?.ultimos4 ?? '')
   const [diaPago, setDiaPago] = useState(txt(inicial?.diaPago))
   const [diaCorte, setDiaCorte] = useState(txt(inicial?.diaCorte))
   const [ultimoPago, setUltimoPago] = useState(inicial?.fechaUltimoPago ?? '')
@@ -103,6 +104,7 @@ export function FormDeuda({
       tipoTasa,
       cuotaMensual: cuotaNum,
       limiteCredito: esTarjeta ? parseFloat(limite) || undefined : undefined,
+      ultimos4: /^\d{4}$/.test(ultimos4) ? ultimos4 : undefined,
       diaPago: parseInt(diaPago, 10) || undefined,
       diaCorte: esTarjeta ? parseInt(diaCorte, 10) || undefined : undefined,
       fechaUltimoPago: ultimoPago || undefined,
@@ -209,13 +211,30 @@ export function FormDeuda({
         )}
 
         {esTarjeta && (
-          <div>
-            <label className={ETIQUETA} htmlFor="d-limite">
-              Límite de Crédito ($)<span className={OPCIONAL}>opcional</span>
-            </label>
-            <input id="d-limite" type="number" inputMode="decimal" min="0" step="any"
-              value={limite} onChange={(e) => setLimite(e.target.value)} placeholder="Ej. 150000" className={CAMPO} />
+          <div className="grid grid-cols-2 gap-2.5">
+            <div>
+              <label className={ETIQUETA} htmlFor="d-limite">
+                Límite ($)<span className={OPCIONAL}>opcional</span>
+              </label>
+              <input id="d-limite" type="number" inputMode="decimal" min="0" step="any"
+                value={limite} onChange={(e) => setLimite(e.target.value)} placeholder="Ej. 150000" className={CAMPO} />
+            </div>
+            <div>
+              <label className={ETIQUETA} htmlFor="d-ultimos4">
+                Últimos 4 dígitos<span className={OPCIONAL}>opcional</span>
+              </label>
+              <input id="d-ultimos4" inputMode="numeric" maxLength={4} pattern="\d{4}"
+                value={ultimos4} onChange={(e) => setUltimos4(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                placeholder="1234" className={CAMPO} />
+            </div>
           </div>
+        )}
+
+        {esTarjeta && !ultimos4 && (
+          <p className="text-[11px] text-slate-500 leading-relaxed px-1">
+            Con los últimos 4 dígitos, los correos que te manda el banco por cada consumo se
+            asignan solos a esta tarjeta.
+          </p>
         )}
 
         {/* Plazo: para préstamos. Se llena UNO de los dos, el otro se deduce. */}

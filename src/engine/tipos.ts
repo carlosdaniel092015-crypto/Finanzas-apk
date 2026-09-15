@@ -52,6 +52,8 @@ export interface Deuda {
   /** Solo informativo / para mostrar */
   mesesRestantes?: number
   limiteCredito?: number
+  /** Ultimos 4 digitos: es lo que permite casar solo un correo del banco con esta tarjeta */
+  ultimos4?: string
   /** Orden para la estrategia personalizada (1 = primero) */
   prioridadManual?: number
 }

@@ -1,8 +1,10 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ArrowRight, CalendarCheck, Layers, PlusCircle, Sparkles, Target, TrendingDown } from 'lucide-react'
 import { FormDeuda } from '@/components/FormDeuda'
 import { DetalleDeuda } from '@/components/DetalleDeuda'
 import { TarjetaDeuda } from '@/components/TarjetaDeuda'
+import { MovimientosDetectados } from '@/components/MovimientosDetectados'
+import { cargarDetectados, marcarDetectado, type MovimientoDetectado } from '@/data/detectados'
 import { ResultadoPlan } from '@/components/ResultadoPlan'
 import { compararEstrategias, ordenarDeudas, pagoMinimo } from '@/engine/plan'
 import { hoyISO, interesDeLaCartera, pagosPendientes } from '@/engine/movimientos'
@@ -22,11 +24,35 @@ export function Deudas() {
   const mostrarForm = useUI((s) => s.formAbierto)
   const setMostrarForm = useUI((s) => s.setFormAbierto)
 
+  const [detectados, setDetectados] = useState<MovimientoDetectado[]>([])
   const [editando, setEditando] = useState<Deuda | null>(null)
   const [detalleId, setDetalleId] = useState<string | null>(null)
   const [planVisible, setPlanVisible] = useState(false)
 
   const detalle = deudas.find((d) => d.id === detalleId) ?? null
+
+  // Lo que llegó por correo desde la última vez. Si Supabase no está
+  // configurado esto devuelve vacío y la sección no se muestra.
+  const refrescarDetectados = useCallback(() => {
+    void cargarDetectados().then(setDetectados)
+  }, [])
+  useEffect(refrescarDetectados, [refrescarDetectados])
+
+  const confirmarDetectado = (d: MovimientoDetectado, deudaId: string) => {
+    registrarMovimiento(deudaId, {
+      tipo: d.tipo,
+      fecha: d.fecha,
+      monto: d.monto,
+      nota: [d.comercio, d.banco].filter(Boolean).join(' · ') || undefined,
+    })
+    setDetectados((prev) => prev.filter((x) => x.id !== d.id))
+    void marcarDetectado(d.id, 'confirmado')
+  }
+
+  const descartarDetectado = (d: MovimientoDetectado) => {
+    setDetectados((prev) => prev.filter((x) => x.id !== d.id))
+    void marcarDetectado(d.id, 'descartado')
+  }
 
   const totalDeuda = deudas.reduce((s, d) => s + d.saldo, 0)
   const totalCuotas = deudas.reduce((s, d) => s + (d.cuotaMensual || pagoMinimo(d, d.saldo)), 0)
@@ -83,6 +109,16 @@ export function Deudas() {
             else agregarDeuda(d)
             cerrarForm()
           }}
+        />
+      )}
+
+      {!mostrarForm && deudas.length > 0 && (
+        <MovimientosDetectados
+          detectados={detectados}
+          deudas={deudas}
+          moneda={moneda}
+          onConfirmar={confirmarDetectado}
+          onDescartar={descartarDetectado}
         />
       )}
 

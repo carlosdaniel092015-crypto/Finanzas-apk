@@ -12,7 +12,10 @@
     "typecheck": "tsc -b --noEmit false --emitDeclarationOnly false",
     "cap:sync": "npm run build && cap sync android",
     "cap:open": "cap open android",
-    "verificar:supabase": "node scripts/verificar-supabase.mjs"
+    "verificar:supabase": "node scripts/verificar-supabase.mjs",
+    "probar:correo": "vite-node scripts/probar-correo.ts",
+    "sync:correo": "node scripts/sync-correo.mjs",
+    "seed:reglas": "vite-node scripts/generar-seed-reglas.ts"
   },
   "dependencies": {
     "@capacitor/android": "^6.2.0",
@@ -35,6 +38,7 @@
     "tailwindcss": "^3.4.17",
     "typescript": "^5.7.2",
     "vite": "^6.0.7",
+    "vite-node": "^6.0.0",
     "vitest": "^2.1.8"
   }
 }
