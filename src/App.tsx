@@ -7,8 +7,11 @@ import { TarjetaDisponible } from '@/components/TarjetaDisponible'
 import { Deudas } from '@/views/Deudas'
 import { FlujoCaja } from '@/views/FlujoCaja'
 import { Login } from '@/views/Login'
+import { Ajustes } from '@/views/Ajustes'
 import { supabase, supabaseConfigurado } from '@/lib/supabase'
 import { useStore, useUI } from '@/store'
+
+const CLAVE_INVITADO = 'deudacero:invitado'
 
 const TITULOS: Record<Pestana, string> = {
   flujo: 'Control de Presupuesto',
@@ -17,8 +20,26 @@ const TITULOS: Record<Pestana, string> = {
 
 export default function App() {
   const [pestana, setPestana] = useState<Pestana>('flujo')
+  const [enAjustes, setEnAjustes] = useState(false)
   const [sesion, setSesion] = useState<Session | null>(null)
-  const [invitado, setInvitado] = useState(false)
+  // El modo invitado se recuerda: sin esto, quien usa la app sin cuenta vuelve
+  // a la pantalla de login cada vez que la abre.
+  const [invitado, setInvitado] = useState(() => {
+    try {
+      return localStorage.getItem(CLAVE_INVITADO) === '1'
+    } catch {
+      return false
+    }
+  })
+
+  const entrarComoInvitado = () => {
+    try {
+      localStorage.setItem(CLAVE_INVITADO, '1')
+    } catch {
+      /* modo privado: funciona igual, solo no se recuerda */
+    }
+    setInvitado(true)
+  }
   const [authLista, setAuthLista] = useState(!supabaseConfigurado)
   const cargar = useStore((s) => s.cargar)
   const formAbierto = useUI((s) => s.formAbierto)
@@ -30,7 +51,16 @@ export default function App() {
       setSesion(data.session)
       setAuthLista(true)
     })
-    const { data: sub } = supabase.auth.onAuthStateChange((_evento, s) => setSesion(s))
+    const { data: sub } = supabase.auth.onAuthStateChange((_evento, s) => {
+      setSesion(s)
+      if (s) {
+        // Entrar con cuenta manda sobre el modo invitado recordado.
+        try {
+          localStorage.removeItem(CLAVE_INVITADO)
+        } catch { /* nada que limpiar */ }
+        setInvitado(false)
+      }
+    })
     return () => sub.subscription.unsubscribe()
   }, [])
 
@@ -47,10 +77,22 @@ export default function App() {
   }
 
   if (!autenticado) {
-    return <Login onModoLocal={() => setInvitado(true)} />
+    return <Login onModoLocal={entrarComoInvitado} />
   }
 
   const usuario = sesion?.user?.email?.split('@')[0] ?? 'Invitado'
+
+  const sincronizando = supabaseConfigurado && Boolean(sesion)
+
+  if (enAjustes) {
+    return (
+      <Ajustes
+        usuario={usuario}
+        sincronizando={sincronizando}
+        onVolver={() => setEnAjustes(false)}
+      />
+    )
+  }
 
   return (
     <div className="bg-slate-100 min-h-screen flex justify-center">
@@ -58,7 +100,8 @@ export default function App() {
         <Header
           titulo={TITULOS[pestana]}
           usuario={usuario}
-          sincronizando={supabaseConfigurado && Boolean(sesion)}
+          sincronizando={sincronizando}
+          onAjustes={() => setEnAjustes(true)}
         />
         <AvisoSync />
 

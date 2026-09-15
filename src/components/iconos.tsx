@@ -1,6 +1,7 @@
 import {
-  Banknote, Car, CreditCard, Droplets, Flame, Fuel, Home, Landmark, Receipt,
-  ShoppingBag, Smartphone, Tv, Wifi, Zap, type LucideIcon,
+  Banknote, Briefcase, Car, CircleDollarSign, CreditCard, Droplets, Flame, Fuel,
+  Gift, GraduationCap, HeartPulse, Home, Landmark, Percent, Receipt, Shield,
+  ShoppingBag, Smartphone, Store, Tv, Wifi, Zap, type LucideIcon,
 } from 'lucide-react'
 import type { TipoDeuda } from '@/engine/tipos'
 
@@ -9,6 +10,9 @@ const MAPA: Record<string, LucideIcon> = {
   smartphone: Smartphone, tv: Tv, wifi: Wifi, 'credit-card': CreditCard,
   landmark: Landmark, car: Car, 'shopping-bag': ShoppingBag, receipt: Receipt,
   banknote: Banknote,
+  gift: Gift, percent: Percent, briefcase: Briefcase, store: Store,
+  'circle-dollar': CircleDollarSign, 'heart-pulse': HeartPulse,
+  'graduation-cap': GraduationCap, shield: Shield,
 }
 
 export function Icono({ nombre, className }: { nombre: string; className?: string }) {

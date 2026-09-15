@@ -1,5 +1,6 @@
 import type { Repo } from './repo'
-import { ESTADO_INICIAL, type EstadoFinanciero, type GastoFijo } from './tipos'
+import { ESTADO_INICIAL, type EstadoFinanciero, type Gasto, type Ingreso } from './tipos'
+import type { Frecuencia } from '@/engine/frecuencia'
 import type { Deuda, TipoDeuda, TipoTasa } from '@/engine/tipos'
 import { supabase } from '@/lib/supabase'
 import { repoLocal } from './repoLocal'
@@ -100,7 +101,7 @@ export const repoSupabase: Repo = {
         .eq('estado', 'activa'),
       supabase
         .from('recurrentes')
-        .select('id,nombre,monto_estimado,servicio,tipo,dia_del_mes')
+        .select('id,nombre,monto_estimado,servicio,tipo,dia_del_mes,frecuencia')
         .eq('user_id', userId)
         .eq('activo', true),
     ])
@@ -113,18 +114,31 @@ export const repoSupabase: Repo = {
       return { estado: local.estado, error: fallo }
     }
 
-    const ingreso = (recurrentes.data ?? [])
-      .filter((r) => r.tipo === 'ingreso')
-      .reduce((s, r) => s + (Number(r.monto_estimado) || 0), 0)
+    const filas = recurrentes.data ?? []
+    const frec = (v: unknown): Frecuencia =>
+      typeof v === 'string' && v ? (v as Frecuencia) : 'mensual'
 
-    const gastos: GastoFijo[] = ESTADO_INICIAL.gastosFijos.map((base) => {
-      const fila = (recurrentes.data ?? []).find(
-        (r) => r.tipo === 'gasto' && r.nombre === base.nombre,
-      )
-      return fila
-        ? { ...base, monto: Number(fila.monto_estimado) || 0, diaPago: fila.dia_del_mes ?? undefined }
-        : base
-    })
+    const ingresos: Ingreso[] = filas
+      .filter((r) => r.tipo === 'ingreso')
+      .map((r) => ({
+        id: r.id,
+        descripcion: r.nombre,
+        tipo: (r.servicio as Ingreso['tipo']) ?? 'otro',
+        monto: Number(r.monto_estimado) || 0,
+        frecuencia: frec(r.frecuencia),
+        diaCobro: r.dia_del_mes ?? undefined,
+      }))
+
+    const gastos: Gasto[] = filas
+      .filter((r) => r.tipo === 'gasto')
+      .map((r) => ({
+        id: r.id,
+        descripcion: r.nombre,
+        categoria: (r.servicio as Gasto['categoria']) ?? 'otro',
+        monto: Number(r.monto_estimado) || 0,
+        frecuencia: frec(r.frecuencia),
+        diaPago: r.dia_del_mes ?? undefined,
+      }))
 
     // Los movimientos viven en la copia local: son el historial que el usuario
     // ya confirmo, y no queremos perderlos si una tabla remota falla.
@@ -134,8 +148,8 @@ export const repoSupabase: Repo = {
       estado: {
         ...ESTADO_INICIAL,
         moneda: (perfil.data?.moneda as EstadoFinanciero['moneda']) ?? 'DOP',
-        ingresoMensual: ingreso,
-        gastosFijos: gastos,
+        ingresos,
+        gastos,
         deudas: (deudas.data ?? []).map((f) => aDeuda(f as FilaDeuda)),
         movimientos: local.estado?.movimientos ?? [],
       },
@@ -167,28 +181,26 @@ export const repoSupabase: Repo = {
     anotar(await q.eq('estado', 'activa'))
 
     const filasRecurrentes = [
-      ...estado.gastosFijos
-        .filter((g) => g.monto > 0)
-        .map((g) => ({
-          user_id: userId,
-          tipo: 'gasto' as const,
-          nombre: g.nombre,
-          monto_estimado: g.monto,
-          dia_del_mes: g.diaPago ?? null,
-          activo: true,
-        })),
-      ...(estado.ingresoMensual > 0
-        ? [
-            {
-              user_id: userId,
-              tipo: 'ingreso' as const,
-              nombre: 'Ingresos mensuales',
-              monto_estimado: estado.ingresoMensual,
-              dia_del_mes: null,
-              activo: true,
-            },
-          ]
-        : []),
+      ...estado.gastos.map((g) => ({
+        user_id: userId,
+        tipo: 'gasto' as const,
+        nombre: g.descripcion,
+        servicio: g.categoria,
+        monto_estimado: g.monto,
+        frecuencia: g.frecuencia,
+        dia_del_mes: g.diaPago ?? null,
+        activo: true,
+      })),
+      ...estado.ingresos.map((i) => ({
+        user_id: userId,
+        tipo: 'ingreso' as const,
+        nombre: i.descripcion,
+        servicio: i.tipo,
+        monto_estimado: i.monto,
+        frecuencia: i.frecuencia,
+        dia_del_mes: i.diaCobro ?? null,
+        activo: true,
+      })),
     ]
     if (filasRecurrentes.length > 0) {
       anotar(

@@ -1,6 +1,9 @@
 import { create } from 'zustand'
 import { repo } from '@/data/repo'
-import { ESTADO_INICIAL, type EstadoFinanciero, type GastoFijo } from '@/data/tipos'
+import {
+  ESTADO_INICIAL, type EstadoFinanciero, type Gasto, type Ingreso,
+} from '@/data/tipos'
+import { totalMensual } from '@/engine/frecuencia'
 import type { Deuda, Estrategia } from '@/engine/tipos'
 import { aplicarMovimiento, hoyISO, type NuevoMovimiento } from '@/engine/movimientos'
 import type { Moneda } from '@/lib/format'
@@ -10,10 +13,13 @@ interface Store extends EstadoFinanciero {
   errorSync: string | null
   descartarError: () => void
   cargar: () => Promise<void>
-  setIngreso: (monto: number) => void
   setMoneda: (moneda: Moneda) => void
-  setGasto: (id: string, monto: number) => void
-  agregarGasto: (gasto: Omit<GastoFijo, 'id'>) => void
+  setNotificaciones: (activas: boolean) => void
+  agregarIngreso: (ingreso: Omit<Ingreso, 'id'>) => void
+  editarIngreso: (id: string, cambios: Partial<Ingreso>) => void
+  eliminarIngreso: (id: string) => void
+  agregarGasto: (gasto: Omit<Gasto, 'id'>) => void
+  editarGasto: (id: string, cambios: Partial<Gasto>) => void
   eliminarGasto: (id: string) => void
   agregarDeuda: (deuda: Omit<Deuda, 'id'>) => void
   editarDeuda: (id: string, cambios: Partial<Deuda>) => void
@@ -42,8 +48,8 @@ function guardarDiferido(estado: EstadoFinanciero) {
 
 export const useStore = create<Store>((set, get) => {
   const persistir = () => {
-    const { moneda, ingresoMensual, gastosFijos, deudas, movimientos, estrategia } = get()
-    guardarDiferido({ moneda, ingresoMensual, gastosFijos, deudas, movimientos, estrategia })
+    const { moneda, ingresos, gastos, deudas, movimientos, estrategia, notificaciones } = get()
+    guardarDiferido({ moneda, ingresos, gastos, deudas, movimientos, estrategia, notificaciones })
   }
 
   const mutar = (cambio: Partial<EstadoFinanciero>) => {
@@ -64,23 +70,32 @@ export const useStore = create<Store>((set, get) => {
       set({ ...(estado ?? ESTADO_INICIAL), cargando: false, errorSync: error ?? null })
     },
 
-    setIngreso: (ingresoMensual) => mutar({ ingresoMensual: Math.max(0, ingresoMensual) }),
     setMoneda: (moneda) => mutar({ moneda }),
+    setNotificaciones: (notificaciones) => mutar({ notificaciones }),
 
-    setGasto: (id, monto) =>
+    agregarIngreso: (ingreso) =>
+      mutar({ ingresos: [...get().ingresos, { ...ingreso, id: crypto.randomUUID() }] }),
+
+    editarIngreso: (id, cambios) =>
       mutar({
-        gastosFijos: get().gastosFijos.map((g) =>
-          g.id === id ? { ...g, monto: Math.max(0, monto) } : g,
+        ingresos: get().ingresos.map((i) =>
+          i.id === id ? { ...i, ...cambios, id, monto: Math.max(0, cambios.monto ?? i.monto) } : i,
         ),
       }),
 
+    eliminarIngreso: (id) => mutar({ ingresos: get().ingresos.filter((i) => i.id !== id) }),
+
     agregarGasto: (gasto) =>
+      mutar({ gastos: [...get().gastos, { ...gasto, id: crypto.randomUUID() }] }),
+
+    editarGasto: (id, cambios) =>
       mutar({
-        gastosFijos: [...get().gastosFijos, { ...gasto, id: crypto.randomUUID() }],
+        gastos: get().gastos.map((g) =>
+          g.id === id ? { ...g, ...cambios, id, monto: Math.max(0, cambios.monto ?? g.monto) } : g,
+        ),
       }),
 
-    eliminarGasto: (id) =>
-      mutar({ gastosFijos: get().gastosFijos.filter((g) => g.id !== id) }),
+    eliminarGasto: (id) => mutar({ gastos: get().gastos.filter((g) => g.id !== id) }),
 
     agregarDeuda: (deuda) =>
       mutar({
@@ -166,11 +181,15 @@ export const useUI = create<{ formAbierto: boolean; setFormAbierto: (v: boolean)
   }),
 )
 
-/** Ingresos − gastos fijos. Es el motor de todo lo demas. */
+/**
+ * Ingresos − gastos, ambos llevados a su equivalente MENSUAL. Es el motor de
+ * todo lo demas: lo que sobra aqui es lo que ataca las deudas.
+ */
 export function useFlujoCaja() {
-  const ingreso = useStore((s) => s.ingresoMensual)
-  const gastos = useStore((s) => s.gastosFijos)
-  const totalGastos = gastos.reduce((s, g) => s + (g.monto || 0), 0)
+  const ingresos = useStore((s) => s.ingresos)
+  const gastos = useStore((s) => s.gastos)
+  const ingreso = totalMensual(ingresos)
+  const totalGastos = totalMensual(gastos)
   const disponible = Math.max(0, ingreso - totalGastos)
   const pctLibre = ingreso > 0 ? Math.max(0, Math.min(100, (disponible / ingreso) * 100)) : 0
   return { ingreso, totalGastos, disponible, pctLibre, pctGastos: 100 - pctLibre }

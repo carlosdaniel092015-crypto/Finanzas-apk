@@ -1,14 +1,16 @@
-import { ShieldCheck } from 'lucide-react'
+import { Settings, ShieldCheck } from 'lucide-react'
 
 export function Header({
   titulo,
   usuario,
   sincronizando,
+  onAjustes,
 }: {
   titulo: string
   usuario: string
   /** false en modo invitado: el badge no puede prometer nube si no la hay. */
   sincronizando: boolean
+  onAjustes: () => void
 }) {
   const iniciales =
     usuario
@@ -48,9 +50,17 @@ export function Header({
             {sincronizando ? 'Sincronizado' : 'Modo local'}
           </span>
         </div>
-        <div className="w-9 h-9 rounded-full bg-slate-200/80 border border-slate-300/80 flex items-center justify-center text-slate-700 font-bold text-xs">
+        <button
+          type="button"
+          onClick={onAjustes}
+          aria-label="Ajustes"
+          className="relative w-9 h-9 rounded-full bg-slate-200/80 border border-slate-300/80 flex items-center justify-center text-slate-700 font-bold text-xs hover:border-emerald-400 hover:text-emerald-700 active:scale-95 transition"
+        >
           {iniciales}
-        </div>
+          <span className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-white border border-slate-300 flex items-center justify-center">
+            <Settings className="w-2.5 h-2.5 text-slate-500" />
+          </span>
+        </button>
       </div>
     </header>
   )

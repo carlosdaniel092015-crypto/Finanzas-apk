@@ -1,5 +1,5 @@
 import type { Repo } from './repo'
-import { ESTADO_INICIAL, type EstadoFinanciero } from './tipos'
+import { migrarEstado } from './tipos'
 
 const CLAVE = 'deudacero:estado:v1'
 
@@ -14,10 +14,9 @@ export const repoLocal: Repo = {
     try {
       const crudo = localStorage.getItem(CLAVE)
       if (!crudo) return { estado: null }
-      const datos = JSON.parse(crudo) as Partial<EstadoFinanciero>
-      // Mezcla defensiva: un estado guardado por una version vieja no debe
-      // dejar la app sin gastos ni moneda.
-      return { estado: { ...ESTADO_INICIAL, ...datos } as EstadoFinanciero }
+      // Un estado guardado por una version anterior se trae al formato de hoy
+      // en vez de descartarse: nadie debe perder lo que ya habia llenado.
+      return { estado: migrarEstado(JSON.parse(crudo) as Record<string, unknown>) }
     } catch {
       return { estado: null }
     }
